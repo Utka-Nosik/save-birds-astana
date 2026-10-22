@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ru" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Спаси птиц! Астана — Сеть умных кормушек</title>
+    <!-- Tailwind CSS для красивого дизайна -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Leaflet CSS & JS для интерактивной карты -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Иконки Lucide -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
+        body { font-family: 'Nunito', sans-serif; }
+        #map { height: 420px; width: 100%; border-radius: 1rem; z-index: 10; }
+    </style>
+</head>
+<body class="bg-[#F4F7F4] text-slate-800">
+
+    <!-- Навигация -->
+    <header class="bg-white/90 backdrop-blur-md sticky top-0 z-50 border-b border-emerald-100 shadow-sm">
+        <div class="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <div class="bg-emerald-600 text-white p-2 rounded-xl">
+                    <i data-lucide="bird" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <span class="font-extrabold text-lg text-emerald-950 leading-none block">Спаси птиц!</span>
+                    <span class="text-xs text-emerald-600 font-semibold">Астана • AITU EcoProject</span>
+                </div>
+            </div>
+            <nav class="hidden md:flex gap-6 text-sm font-bold text-slate-600">
+                <a href="#station" class="hover:text-emerald-600 transition">Станция (QR)</a>
+                <a href="#map-section" class="hover:text-emerald-600 transition">Карта</a>
+                <a href="#rules" class="hover:text-emerald-600 transition">Чем кормить?</a>
+                <a href="#birds" class="hover:text-emerald-600 transition">Птицы Астаны</a>
+            </nav>
+            <a href="#donate" class="bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm px-4 py-2 rounded-xl shadow-sm transition flex items-center gap-1.5">
+                <i data-lucide="heart" class="w-4 h-4 fill-current"></i> Поддержать
+            </a>
+        </div>
+    </header>
+
+    <!-- Блок QR-станции (То, что видит человек после сканирования QR) -->
+    <section id="station" class="max-w-5xl mx-auto px-4 pt-6 pb-8">
+        <div class="bg-gradient-to-br from-emerald-800 to-teal-900 rounded-3xl p-6 md:p-8 text-white shadow-xl relative overflow-hidden">
+            <div class="relative z-10 grid md:grid-cols-2 gap-6 items-center">
+                <div>
+                    <div class="inline-flex items-center gap-2 bg-emerald-700/70 border border-emerald-500/40 px-3 py-1 rounded-full text-xs font-bold mb-4">
+                        <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                        Вы отсканировали QR-код кормушки
+                    </div>
+                    <h1 class="text-2xl md:text-4xl font-extrabold mb-2" id="station-title">Станция #01: Кампус AITU</h1>
+                    <p class="text-emerald-100 text-sm mb-6">Экспо-территория, возле главного входа Astana IT University. Спасибо, что не прошли мимо!</p>
+                    
+                    <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-4 mb-6 border border-white/15 grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                            <span class="text-emerald-200 text-xs block">Статус корма:</span>
+                            <span class="font-bold text-amber-300 flex items-center gap-1 mt-0.5" id="station-status">
+                                <i data-lucide="alert-circle" class="w-4 h-4"></i> Пора пополнить
+                            </span>
+                        </div>
+                        <div>
+                            <span class="text-emerald-200 text-xs block">Последняя проверка:</span>
+                            <span class="font-bold text-white block mt-0.5" id="station-time">Вчера, 16:40</span>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap gap-3">
+                        <button onclick="openModal('feed')" class="bg-amber-500 hover:bg-amber-600 text-white font-bold px-5 py-3 rounded-xl shadow-lg transition flex items-center gap-2 text-sm">
+                            <i data-lucide="camera" class="w-4 h-4"></i> Я насыпал(а) корм!
+                        </button>
+                        <button onclick="openModal('report')" class="bg-white/15 hover:bg-white/25 text-white font-bold px-4 py-3 rounded-xl transition flex items-center gap-2 text-sm">
+                            <i data-lucide="wrench" class="w-4 h-4"></i> Сообщить о поломке
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Журнал активности по этой кормушке -->
+                <div class="bg-white text-slate-800 rounded-2xl p-5 shadow-lg">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="font-extrabold text-sm flex items-center gap-2">
+                            <i data-lucide="history" class="w-4 h-4 text-emerald-600"></i> Журнал ухода за станцией
+                        </h3>
+                        <span class="text-[11px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">Модерация AITU</span>
+                    </div>
+                    <div class="space-y-3 text-xs" id="activity-log">
+                        <div class="flex items-start gap-3 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                            <div class="bg-emerald-100 text-emerald-700 p-2 rounded-lg"><i data-lucide="check-circle-2" class="w-4 h-4"></i></div>
+                            <div>
+                                <div class="font-bold">Балауса К. пополнила корм (Семечки)</div>
+                                <div class="text-slate-400">Вчера в 16:40 • Фото проверено волонтёром</div>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                            <div class="bg-blue-100 text-blue-700 p-2 rounded-lg"><i data-lucide="sparkles" class="w-4 h-4"></i></div>
+                            <div>
+                                <div class="font-bold">Бақдәулет Ә. провёл санитарную очистку</div>
+                                <div class="text-slate-400">3 дня назад • Плановый обход</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Карта кормушек Астаны -->
+    <section id="map-section" class="max-w-5xl mx-auto px-4 py-6">
+        <div class="flex flex-col md:flex-row md:items-end justify-between mb-4 gap-2">
+            <div>
+                <h2 class="text-2xl font-extrabold text-slate-900 flex items-center gap-2">
+                    <i data-lucide="map-pin" class="w-6 h-6 text-emerald-600"></i> Карта кормушек Астаны
+                </h2>
+                <p class="text-sm text-slate-600">Нажмите на метку на карте, чтобы проверить состояние скворечника/кормушки</p>
+            </div>
+            <div class="flex gap-3 text-xs font-bold">
+                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span> Полная</span>
+                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-amber-500 inline-block"></span> Мало корма</span>
+                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-rose-500 inline-block"></span> Нужен ремонт</span>
+            </div>
+        </div>
+
+        <div class="bg-white p-3 rounded-3xl shadow-md border border-slate-100">
+            <div id="map"></div>
+        </div>
+    </section>
+
+    <!-- Памятка: Чем можно и нельзя кормить -->
+    <section id="rules" class="max-w-5xl mx-auto px-4 py-8">
+        <h2 class="text-2xl font-extrabold text-slate-900 mb-2">Правила безопасной подкормки</h2>
+        <p class="text-sm text-slate-600 mb-6">Зимой в Астане морозы достигают -35°C. Неправильный корм может погубить птицу!</p>
+
+        <div class="grid md:grid-cols-2 gap-6">
+            <!-- Можно -->
+            <div class="bg-emerald-50/70 border-2 border-emerald-200 rounded-3xl p-6">
+                <div class="flex items-center gap-2 text-emerald-800 font-extrabold text-lg mb-4">
+                    <i data-lucide="check-circle" class="w-6 h-6 text-emerald-600"></i> ЧЕМ МОЖНО КОРМИТЬ:
+                </div>
+                <ul class="space-y-3 text-sm text-slate-700 font-semibold">
+                    <li class="flex items-center gap-2"><span class="text-lg">🌻</span> <b>Семечки подсолнечника</b> (нежареные и несолёные!)</li>
+                    <li class="flex items-center gap-2"><span class="text-lg">🌾</span> <b>Просо, овёс, пшеница</b> (любимая еда воробьёв и щеглов)</li>
+                    <li class="flex items-center gap-2"><span class="text-lg">🎃</span> <b>Сырые тыквенные и арбузные семечки</b></li>
+                    <li class="flex items-center gap-2"><span class="text-lg">🍎</span> <b>Сушёные ягоды рябины, боярышника, кусочки яблок</b></li>
+                    <li class="flex items-center gap-2"><span class="text-lg">🥓</span> <b>Несолёное сало</b> (отлично даёт энергию синицам в мороз)</li>
+                </ul>
+            </div>
+
+            <!-- Нельзя -->
+            <div class="bg-rose-50/70 border-2 border-rose-200 rounded-3xl p-6">
+                <div class="flex items-center gap-2 text-rose-800 font-extrabold text-lg mb-4">
+                    <i data-lucide="x-circle" class="w-6 h-6 text-rose-600"></i> СТРОГО ЗАПРЕЩЕНО:
+                </div>
+                <ul class="space-y-3 text-sm text-slate-700 font-semibold">
+                    <li class="flex items-center gap-2"><span class="text-lg">🍞</span> <b>Свежий и чёрный хлеб</b> (вызывает брожение в зобе)</li>
+                    <li class="flex items-center gap-2"><span class="text-lg">🧂</span> <b>Любое солёное, жареное, острое</b> (соль — яд для почек птиц)</li>
+                    <li class="flex items-center gap-2"><span class="text-lg">🥨</span> <b>Чипсы, сухарики, печенье, сдоба</b></li>
+                    <li class="flex items-center gap-2"><span class="text-lg">🍚</span> <b>Шлифованный белый рис и пшено</b> (окисляется на воздухе)</li>
+                    <li class="flex items-center gap-2"><span class="text-lg">🦠</span> <b>Заплесневелые или прогорклые крупы</b></li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- Птицы Астаны -->
+    <section id="birds" class="max-w-5xl mx-auto px-4 py-6">
+        <h2 class="text-2xl font-extrabold text-slate-900 mb-6 flex items-center gap-2">
+            <i data-lucide="feather" class="w-6 h-6 text-emerald-600"></i> Кого можно встретить у кормушки?
+        </h2>
+        <div class="grid sm:grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                <div class="text-3xl mb-2">🐦</div>
+                <h3 class="font-extrabold text-slate-900">Большая синица</h3>
+                <p class="text-xs text-slate-500 mt-1">Узнаётся по жёлтой грудке с чёрным «галстуком». Обожает семечки и несолёное сало.</p>
+            </div>
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                <div class="text-3xl mb-2">🐤</div>
+                <h3 class="font-extrabold text-slate-900">Полевой воробей</h3>
+                <p class="text-xs text-slate-500 mt-1">Коричневая шапочка и чёрные пятнышки на щёчках. Держится дружными стайками, любит просо.</p>
+            </div>
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                <div class="text-3xl mb-2">🌺</div>
+                <h3 class="font-extrabold text-slate-900">Обыкновенный снегирь</h3>
+                <p class="text-xs text-slate-500 mt-1">Прилетает в Астану с зимними холодами. Питается семенами ясеня, рябины и подсолнуха.</p>
+            </div>
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                <div class="text-3xl mb-2">🪶</div>
+                <h3 class="font-extrabold text-slate-900">Свиристель</h3>
+                <p class="text-xs text-slate-500 mt-1">Красивая птица с задорным хохолком на голове. Очень любит сушёные ягоды и кусочки яблок.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Блок Доната (Kaspi) -->
+    <section id="donate" class="max-w-5xl mx-auto px-4 py-8">
+        <div class="bg-gradient-to-r from-amber-500 to-orange-500 rounded-3xl p-6 md:p-8 text-white shadow-lg grid md:grid-cols-3 gap-6 items-center">
+            <div class="md:col-span-2">
+                <span class="bg-white/20 text-xs font-extrabold px-3 py-1 rounded-full uppercase">Поддержка проекта</span>
+                <h2 class="text-2xl md:text-3xl font-extrabold mt-3 mb-2">На семечки и новые кормушки 🌻</h2>
+                <p class="text-amber-50 text-sm mb-4">
+                    Все собранные средства идут на закуп безопасного зернового корма на зиму и материалов для изготовления новых эко-кормушек студентами и волонтёрами Астаны.
+                </p>
+                <!-- Прогресс сбора -->
+                <div class="bg-black/20 rounded-2xl p-4 mb-4">
+                    <div class="flex justify-between text-xs font-bold mb-1.5">
+                        <span>Собрано на зимний запас корма: 18 500 ₸</span>
+                        <span>Цель: 50 000 ₸</span>
+                    </div>
+                    <div class="w-full bg-white/30 h-3 rounded-full overflow-hidden">
+                        <div class="bg-white h-full rounded-full" style="width: 37%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Карточка Kaspi -->
+            <div class="bg-white text-slate-800 p-5 rounded-2xl shadow-xl text-center">
+                <div class="bg-red-500 text-white font-extrabold text-xs py-1 px-3 rounded-full inline-block mb-2">Kaspi.kz</div>
+                <div class="font-extrabold text-base mb-1">Быстрый перевод</div>
+                <p class="text-xs text-slate-500 mb-3">Перевод волонтёру проекта (Бақдәулет Ә.)</p>
+                <div class="bg-slate-100 p-3 rounded-xl font-extrabold text-sm tracking-wide mb-3 select-all">
+                    +7 (705) 980-33-63
+                </div>
+                <button onclick="alert('Номер +77059803363 скопирован! Спасибо за помощь птицам Астаны 💚')" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-xs transition">
+                    Скопировать номер
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Подвал с данными авторов из вашей заявки -->
+    <footer class="bg-white border-t border-slate-200 mt-8 py-8 text-xs text-slate-500">
+        <div class="max-w-5xl mx-auto px-4 flex flex-col md:flex-row justify-between gap-4">
+            <div>
+                <div class="font-extrabold text-slate-800 text-sm mb-1">Проект «Спаси птиц! Астана»</div>
+                <p>Концепция сети безопасных зимних кормушек с QR-кодами и веб-сервисом координации ухода.</p>
+                <p class="mt-1 text-emerald-700 font-semibold">Учебное заведение: Astana IT University</p>
+            </div>
+            <div>
+                <div class="font-bold text-slate-800 mb-1">Авторы проекта:</div>
+                <p>Әбдіқұл Бақдәулет Болатұлы (bakoabdi77@gmail.com)</p>
+                <p>Құттымбек Балауса Мадиярқызы (balausaktm@gmail.com)</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Модальное окно для Фотоотчёта / Поломки -->
+    <div id="modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-extrabold text-lg text-slate-900" id="modal-title">Отметить пополнение корма</h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <form onsubmit="submitForm(event)" class="space-y-4 text-sm">
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Ваше имя</label>
+                    <input type="text" id="user-name" required placeholder="Например, Алихан" class="w-full border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1" id="modal-desc-label">Что вы насыпали?</label>
+                    <input type="text" id="user-desc" required placeholder="Нежареные семечки, просо..." class="w-full border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Прикрепить фото (для проверки)</label>
+                    <input type="file" accept="image/*" class="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100">
+                </div>
+                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition">
+                    Отправить отчёт волонтёрам
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Инициализация иконок
+        lucide.createIcons();
+
+        // Инициализация карты Астаны (Фокус на район AITU и Ботанического сада)
+        const map = L.map('map').setView([51.092, 71.418], 14);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        // Демонстрационные станции (Кормушки)
+        const stations = [
+            { id: 1, name: "Станция #01: Кампус AITU (Главный вход)", coords: [51.0908, 71.4183], status: "Пора пополнить", color: "#f59e0b", time: "Вчера, 16:40" },
+            { id: 2, name: "Станция #02: Ботанический сад (Север)", coords: [51.1035, 71.4160], status: "Кормушка полная", color: "#10b981", time: "Сегодня, 10:15" },
+            { id: 3, name: "Станция #03: Линейный парк (возле Abu Dhabi Plaza)", coords: [51.1180, 71.4280], status: "Кормушка полная", color: "#10b981", time: "Сегодня, 11:30" },
+            { id: 4, name: "Станция #04: Сквер возле EXPO", coords: [51.0885, 71.4120], status: "Требуется чистка/ремонт", color: "#f43f5e", time: "3 дня назад" }
+        ];
+
+        stations.forEach(st => {
+            const markerHtml = `<div style="background-color:${st.color}; width:20px; height:20px; border-radius:50%; border:3px solid white; box-shadow:0 2px 5px rgba(0,0,0,0.3);"></div>`;
+            const icon = L.divIcon({ html: markerHtml, className: '' });
+            
+            const marker = L.marker(st.coords, { icon }).addTo(map);
+            marker.bindPopup(`
+                <div style="font-family:sans-serif; min-width:180px;">
+                    <b>${st.name}</b><br>
+                    <span style="color:${st.color}; font-weight:bold;">● ${st.status}</span><br>
+                    <small style="color:#666;">Проверка: ${st.time}</small><br>
+                    <button onclick="selectStation(${st.id})" style="margin-top:6px; background:#059669; color:white; border:none; padding:4px 10px; border-radius:6px; cursor:pointer; font-size:12px; width:100%;">Открыть карточку</button>
+                </div>
+            `);
+        });
+
+        function selectStation(id) {
+            const st = stations.find(s => s.id === id);
+            if (!st) return;
+            document.getElementById('station-title').innerText = st.name;
+            document.getElementById('station-status').innerText = st.status;
+            document.getElementById('station-time').innerText = st.time;
+            window.location.hash = "#station";
+        }
+
+        // Логика модального окна
+        let currentAction = 'feed';
+        function openModal(type) {
+            currentAction = type;
+            const modal = document.getElementById('modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            if (type === 'feed') {
+                document.getElementById('modal-title').innerText = 'Отметить пополнение корма 🌻';
+                document.getElementById('modal-desc-label').innerText = 'Какой корм вы насыпали?';
+            } else {
+                document.getElementById('modal-title').innerText = 'Сообщить о проблеме 🛠️';
+                document.getElementById('modal-desc-label').innerText = 'Что случилось со станцией?';
+            }
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function submitForm(e) {
+            e.preventDefault();
+            const name = document.getElementById('user-name').value;
+            const desc = document.getElementById('user-desc').value;
+            const log = document.getElementById('activity-log');
+
+            const newEntry = document.createElement('div');
+            newEntry.className = "flex items-start gap-3 p-2.5 rounded-xl bg-emerald-50 border border-emerald-200";
+            newEntry.innerHTML = `
+                <div class="bg-emerald-600 text-white p-2 rounded-lg">✓</div>
+                <div>
+                    <div class="font-bold">${name}: ${desc}</div>
+                    <div class="text-emerald-700 font-semibold">Только что • Отправлено на проверку ответственному</div>
+                </div>
+            `;
+            log.prepend(newEntry);
+
+            if (currentAction === 'feed') {
+                document.getElementById('station-status').innerText = "Пополнено (На проверке)";
+                document.getElementById('station-time').innerText = "Только что";
+            }
+            closeModal();
+            e.target.reset();
+        }
+    </script>
+</body>
+</html>
