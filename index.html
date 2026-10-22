@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="ru" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Спаси птиц! Астана — Сеть умных кормушек</title>
+    <!-- Tailwind CSS для дизайна -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Leaflet CSS & JS для интерактивной карты -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Иконки Lucide -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+        body { font-family: 'Nunito', sans-serif; }
+        #map { height: 420px; width: 100%; border-radius: 1rem; z-index: 10; }
+        .custom-popup .leaflet-popup-content-wrapper {
+            border-radius: 1rem;
+            padding: 4px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-[#F4F7F4] text-slate-800">
+
+    <!-- Навигация -->
+    <header class="bg-white/95 backdrop-blur-md sticky top-0 z-50 border-b border-emerald-100 shadow-sm">
+        <div class="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center gap-3">
+            <div class="flex items-center gap-2">
+                <div class="bg-emerald-600 text-white p-2 rounded-xl shadow-sm">
+                    <i data-lucide="bird" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <span class="font-extrabold text-lg text-emerald-950 leading-none block" data-i18n="site_title">Спаси птиц!</span>
+                    <span class="text-xs text-emerald-600 font-semibold" data-i18n="site_sub">Астана • AITU EcoProject</span>
+                </div>
+            </div>
+
+            <nav class="hidden md:flex gap-6 text-sm font-bold text-slate-600">
+                <a href="#station" class="hover:text-emerald-600 transition" data-i18n="nav_station">Станция (QR)</a>
+                <a href="#map-section" class="hover:text-emerald-600 transition" data-i18n="nav_map">Карта</a>
+                <a href="#rules" class="hover:text-emerald-600 transition" data-i18n="nav_rules">Чем кормить?</a>
+                <a href="#birds" class="hover:text-emerald-600 transition" data-i18n="nav_birds">Птицы Астаны</a>
+            </nav>
+
+            <div class="flex items-center gap-2.5">
+                <!-- Переключатель языка KZ / RU -->
+                <div class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-extrabold">
+                    <button onclick="setLanguage('kz')" id="lang-btn-kz" class="px-2.5 py-1 rounded-lg transition duration-200">
+                        KZ
+                    </button>
+                    <button onclick="setLanguage('ru')" id="lang-btn-ru" class="px-2.5 py-1 rounded-lg transition duration-200">
+                        RU
+                    </button>
+                </div>
+
+                <a href="#donate" class="bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm px-3.5 py-2 rounded-xl shadow-sm transition flex items-center gap-1.5 active:scale-95">
+                    <i data-lucide="heart" class="w-4 h-4 fill-current"></i> <span data-i18n="nav_donate">Поддержать</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Блок QR-станции -->
+    <section id="station" class="max-w-5xl mx-auto px-4 pt-6 pb-8">
+        <!-- Быстрый выбор кормушки для тестов и жюри -->
+        <div class="flex items-center justify-between gap-2 mb-3 overflow-x-auto pb-1">
+            <span class="text-xs font-bold text-slate-500 whitespace-nowrap flex items-center gap-1">
+                <i data-lucide="radio" class="w-3.5 h-3.5 text-emerald-600"></i> <span data-i18n="pills_label">Станции сети:</span>
+            </span>
+            <div class="flex items-center gap-2">
+                <div class="flex gap-1.5" id="station-pills">
+                    <!-- Генерируется через JS -->
+                </div>
+                <a href="sticker.html" target="_blank" title="Распечатать наклейку с QR-кодом" class="bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-xl text-xs font-bold transition flex items-center gap-1 flex-shrink-0">
+                    <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+                    <span>Печать QR</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-br from-emerald-800 to-teal-900 rounded-3xl p-6 md:p-8 text-white shadow-xl relative overflow-hidden">
+            <div class="relative z-10 grid md:grid-cols-2 gap-6 items-center">
+                <div>
+                    <div class="inline-flex items-center gap-2 bg-emerald-700/70 border border-emerald-500/40 px-3 py-1 rounded-full text-xs font-bold mb-4">
+                        <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                        <span id="qr-badge-text" data-i18n="qr_scanned_badge">QR-код кормушки активен</span>
+                    </div>
+                    <h1 class="text-2xl md:text-3xl font-extrabold mb-2" id="station-title">Станция #01: Кампус AITU</h1>
+                    <p class="text-emerald-100 text-sm mb-6 leading-relaxed" id="station-desc">Экспо-территория, возле главного входа Astana IT University. Спасибо, что заботитесь о городских птицах!</p>
+                    
+                    <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-4 mb-6 border border-white/15 grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                            <span class="text-emerald-200 text-xs block font-medium" data-i18n="feed_status_label">Статус корма:</span>
+                            <span class="font-bold flex items-center gap-1.5 mt-0.5" id="station-status">
+                                <i data-lucide="alert-circle" class="w-4 h-4 text-amber-300"></i>
+                                <span class="text-amber-300">Пора пополнить</span>
+                            </span>
+                        </div>
+                        <div>
+                            <span class="text-emerald-200 text-xs block font-medium" data-i18n="last_check_label">Последняя проверка:</span>
+                            <span class="font-bold text-white block mt-0.5" id="station-time">Вчера, 16:40</span>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap gap-3">
+                        <button onclick="openModal('feed')" class="bg-amber-500 hover:bg-amber-600 text-white font-bold px-5 py-3 rounded-xl shadow-lg transition flex items-center gap-2 text-sm active:scale-95">
+                            <i data-lucide="camera" class="w-4 h-4"></i> <span data-i18n="btn_feed">Я насыпал(а) корм!</span>
+                        </button>
+                        <button onclick="openModal('report')" class="bg-white/15 hover:bg-white/25 text-white font-bold px-4 py-3 rounded-xl transition flex items-center gap-2 text-sm active:scale-95">
+                            <i data-lucide="wrench" class="w-4 h-4"></i> <span data-i18n="btn_report">Сообщить о поломке</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Журнал активности по выбранной кормушке -->
+                <div class="bg-white text-slate-800 rounded-2xl p-5 shadow-lg">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="font-extrabold text-sm flex items-center gap-2">
+                            <i data-lucide="history" class="w-4 h-4 text-emerald-600"></i> <span data-i18n="log_title">Журнал ухода за станцией</span>
+                        </h3>
+                        <span class="text-[11px] bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
+                            <i data-lucide="shield-check" class="w-3 h-3"></i> <span data-i18n="log_verified">Проверено AITU</span>
+                        </span>
+                    </div>
+                    <div class="space-y-2.5 text-xs max-h-60 overflow-y-auto pr-1" id="activity-log">
+                        <!-- Записи генерируются динамически -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Карта кормушек Астаны -->
+    <section id="map-section" class="max-w-5xl mx-auto px-4 py-6">
+        <div class="flex flex-col md:flex-row md:items-end justify-between mb-4 gap-2">
+            <div>
+                <h2 class="text-2xl font-extrabold text-slate-900 flex items-center gap-2">
+                    <i data-lucide="map-pin" class="w-6 h-6 text-emerald-600"></i> <span data-i18n="map_title">Карта кормушек Астаны</span>
+                </h2>
+                <p class="text-sm text-slate-600" data-i18n="map_sub">Нажмите на метку на карте, чтобы открыть карточку скворечника/кормушки</p>
+            </div>
+            <div class="flex flex-wrap gap-3 text-xs font-bold">
+                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-500 inline-block shadow-sm"></span> <span data-i18n="legend_full">Полная</span></span>
+                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-amber-500 inline-block shadow-sm"></span> <span data-i18n="legend_low">Мало корма</span></span>
+                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-rose-500 inline-block shadow-sm"></span> <span data-i18n="legend_repair">Нужен ремонт</span></span>
+            </div>
+        </div>
+
+        <div class="bg-white p-3 rounded-3xl shadow-md border border-slate-100">
+            <div id="map"></div>
+        </div>
+    </section>
+
+    <!-- Памятка: Чем можно и нельзя кормить -->
+    <section id="rules" class="max-w-5xl mx-auto px-4 py-8">
+        <h2 class="text-2xl font-extrabold text-slate-900 mb-2" data-i18n="rules_title">Правила безопасной подкормки</h2>
+        <p class="text-sm text-slate-600 mb-6" data-i18n="rules_sub">Зимой в Астане морозы достигают -35°C и дуют сильные бураны. Неправильный корм может погубить птицу!</p>
+
+        <div class="grid md:grid-cols-2 gap-6">
+            <!-- Можно -->
+            <div class="bg-emerald-50/70 border-2 border-emerald-200 rounded-3xl p-6">
+                <div class="flex items-center gap-2 text-emerald-800 font-extrabold text-lg mb-4">
+                    <i data-lucide="check-circle" class="w-6 h-6 text-emerald-600"></i> <span data-i18n="rules_allowed_title">ЧЕМ МОЖНО КОРМИТЬ:</span>
+                </div>
+                <ul class="space-y-3 text-sm text-slate-700 font-semibold" id="rules-allowed-list">
+                    <!-- Заполняется через JS i18n -->
+                </ul>
+            </div>
+
+            <!-- Нельзя -->
+            <div class="bg-rose-50/70 border-2 border-rose-200 rounded-3xl p-6">
+                <div class="flex items-center gap-2 text-rose-800 font-extrabold text-lg mb-4">
+                    <i data-lucide="x-circle" class="w-6 h-6 text-rose-600"></i> <span data-i18n="rules_forbidden_title">СТРОГО ЗАПРЕЩЕНО:</span>
+                </div>
+                <ul class="space-y-3 text-sm text-slate-700 font-semibold" id="rules-forbidden-list">
+                    <!-- Заполняется через JS i18n -->
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- Птицы Астаны (С реальными фотографиями) -->
+    <section id="birds" class="max-w-5xl mx-auto px-4 py-6">
+        <div class="flex flex-col sm:flex-row sm:items-end justify-between mb-6 gap-2">
+            <div>
+                <h2 class="text-2xl font-extrabold text-slate-900 flex items-center gap-2">
+                    <i data-lucide="feather" class="w-6 h-6 text-emerald-600"></i> <span data-i18n="birds_title">Кого можно встретить у кормушки?</span>
+                </h2>
+                <p class="text-sm text-slate-600" data-i18n="birds_sub">Зимующие птицы Астаны, которым мы помогаем пережить суровые морозы</p>
+            </div>
+            <span class="text-xs font-bold text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full w-fit" data-i18n="birds_badge">4 ключевых вида</span>
+        </div>
+
+        <div class="grid sm:grid-cols-2 md:grid-cols-4 gap-4" id="birds-grid">
+            <!-- Заполняется динамически через JS i18n -->
+        </div>
+    </section>
+
+    <!-- Блок Доната (Kaspi) -->
+    <section id="donate" class="max-w-5xl mx-auto px-4 py-8">
+        <div class="bg-gradient-to-r from-amber-500 to-orange-500 rounded-3xl p-6 md:p-8 text-white shadow-lg grid md:grid-cols-3 gap-6 items-center">
+            <div class="md:col-span-2">
+                <span class="bg-white/20 text-xs font-extrabold px-3 py-1 rounded-full uppercase tracking-wider" data-i18n="donate_badge">Поддержка проекта</span>
+                <h2 class="text-2xl md:text-3xl font-extrabold mt-3 mb-2" data-i18n="donate_title">На семечки и новые кормушки 🌻</h2>
+                <p class="text-amber-50 text-sm mb-4 leading-relaxed" data-i18n="donate_desc">
+                    Все собранные средства идут на закуп безопасного зернового корма на зиму и материалов для изготовления новых эко-кормушек студентами и волонтёрами Астаны.
+                </p>
+                <!-- Прогресс сбора -->
+                <div class="bg-black/20 rounded-2xl p-4 mb-2">
+                    <div class="flex justify-between text-xs font-bold mb-1.5">
+                        <span data-i18n="donate_collected">Собрано на зимний запас корма: 18 500 ₸</span>
+                        <span data-i18n="donate_goal">Цель: 50 000 ₸</span>
+                    </div>
+                    <div class="w-full bg-white/30 h-3 rounded-full overflow-hidden">
+                        <div class="bg-white h-full rounded-full transition-all duration-500" style="width: 37%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Карточка Kaspi -->
+            <div class="bg-white text-slate-800 p-5 rounded-2xl shadow-xl text-center">
+                <div class="bg-red-500 text-white font-extrabold text-xs py-1 px-3 rounded-full inline-block mb-2">Kaspi.kz</div>
+                <div class="font-extrabold text-base mb-1" data-i18n="kaspi_title">Быстрый перевод</div>
+                <p class="text-xs text-slate-500 mb-3" data-i18n="kaspi_sub">Перевод волонтёру проекта (Бақдәулет Ә.)</p>
+                <div class="bg-slate-100 p-3 rounded-xl font-extrabold text-sm tracking-wide mb-3 select-all text-slate-800 border border-slate-200" id="kaspi-phone">
+                    +7 (705) 980-33-63
+                </div>
+                <button onclick="copyKaspiNumber()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-2 active:scale-95 shadow-sm">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                    <span data-i18n="btn_copy">Скопировать номер</span>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Подвал с данными авторов из вашей заявки -->
+    <footer class="bg-white border-t border-slate-200 mt-8 py-8 text-xs text-slate-500">
+        <div class="max-w-5xl mx-auto px-4 flex flex-col md:flex-row justify-between gap-4">
+            <div>
+                <div class="font-extrabold text-slate-800 text-sm mb-1" data-i18n="footer_title">Проект «Спаси птиц! Астана»</div>
+                <p data-i18n="footer_desc">Концепция сети безопасных зимних кормушек с QR-кодами и веб-сервисом координации ухода.</p>
+                <p class="mt-1 text-emerald-700 font-semibold" data-i18n="footer_uni">Учебное заведение: Astana IT University (AITU)</p>
+            </div>
+            <div>
+                <div class="font-bold text-slate-800 mb-1" data-i18n="footer_authors">Авторы проекта:</div>
+                <p>Әбдіқұл Бақдәулет Болатұлы (<a href="mailto:bakoabdi77@gmail.com" class="hover:text-emerald-600 underline">bakoabdi77@gmail.com</a>)</p>
+                <p>Құттымбек Балауса Мадиярқызы (<a href="mailto:balausaktm@gmail.com" class="hover:text-emerald-600 underline">balausaktm@gmail.com</a>)</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Модальное окно для Фотоотчёта / Поломки -->
+    <div id="modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-extrabold text-lg text-slate-900" id="modal-title">Отметить пополнение корма</h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <form onsubmit="submitForm(event)" class="space-y-4 text-sm">
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1" data-i18n="modal_name_label">Ваше имя</label>
+                    <input type="text" id="user-name" required placeholder="Например, Алихан" data-i18n-ph="modal_name_ph" class="w-full border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1" id="modal-desc-label">Что вы насыпали?</label>
+                    <input type="text" id="user-desc" required placeholder="Нежареные семечки, просо..." class="w-full border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1" data-i18n="modal_photo_label">Прикрепить фото (для модерации)</label>
+                    <input type="file" id="user-photo" accept="image/*" class="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer">
+                </div>
+                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition active:scale-98 shadow-md" data-i18n="modal_submit_btn">
+                    Отправить отчёт волонтёрам
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Всплывающее уведомление (Toast) -->
+    <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-24 opacity-0 transition-all duration-300 pointer-events-none flex items-center gap-3 bg-slate-900/95 text-white px-4 py-3 rounded-2xl shadow-2xl border border-slate-700 text-sm max-w-sm">
+        <div id="toast-icon" class="p-2 bg-emerald-500 rounded-xl text-white flex-shrink-0">
+            <i data-lucide="check" class="w-4 h-4"></i>
+        </div>
+        <div id="toast-message" class="font-bold text-xs leading-snug">Номер скопирован!</div>
+    </div>
+
+    <script>
+        // Словарь переводов (RU / KZ)
+        const i18n = {
+            ru: {
+                site_title: "Спаси птиц!",
+                site_sub: "Астана • AITU EcoProject",
+                nav_station: "Станция (QR)",
+                nav_map: "Карта",
+                nav_rules: "Чем кормить?",
+                nav_birds: "Птицы Астаны",
+                nav_donate: "Поддержать",
+                pills_label: "Станции сети:",
+                qr_scanned_badge: "QR-код кормушки активен",
+                feed_status_label: "Статус корма:",
+                last_check_label: "Последняя проверка:",
+                btn_feed: "Я насыпал(а) корм!",
+                btn_report: "Сообщить о поломке",
+                log_title: "Журнал ухода за станцией",
+                log_verified: "Проверено AITU",
+                log_empty: "Пока нет записей по этой станции. Будьте первыми!",
+                map_title: "Карта кормушек Астаны",
+                map_sub: "Нажмите на метку на карте, чтобы открыть карточку скворечника/кормушки",
+                legend_full: "Полная",
+                legend_low: "Мало корма",
+                legend_repair: "Нужен ремонт",
+                open_card_btn: "Открыть карточку",
+                check_prefix: "Проверка: ",
+                rules_title: "Правила безопасной подкормки",
+                rules_sub: "Зимой в Астане морозы достигают -35°C и дуют сильные бураны. Неправильный корм может погубить птицу!",
+                rules_allowed_title: "ЧЕМ МОЖНО КОРМИТЬ:",
+                rules_forbidden_title: "СТРОГО ЗАПРЕЩЕНО:",
+                birds_title: "Кого можно встретить у кормушки?",
+                birds_sub: "Зимующие птицы Астаны, которым мы помогаем пережить суровые морозы",
+                birds_badge: "4 ключевых вида",
+                donate_badge: "Поддержка проекта",
+                donate_title: "На семечки и новые кормушки 🌻",
+                donate_desc: "Все собранные средства идут на закуп безопасного зернового корма на зиму и материалов для изготовления новых эко-кормушек студентами и волонтёрами Астаны.",
+                donate_collected: "Собрано на зимний запас корма: 18 500 ₸",
+                donate_goal: "Цель: 50 000 ₸",
+                kaspi_title: "Быстрый перевод",
+                kaspi_sub: "Перевод волонтёру проекта (Бақдәулет Ә.)",
+                btn_copy: "Скопировать номер",
+                footer_title: "Проект «Спаси птиц! Астана»",
+                footer_desc: "Концепция сети безопасных зимних кормушек с QR-кодами и веб-сервисом координации ухода.",
+                footer_uni: "Учебное заведение: Astana IT University (AITU)",
+                footer_authors: "Авторы проекта:",
+                modal_feed_title: "Отметить пополнение корма 🌻",
+                modal_feed_label: "Какой корм вы насыпали?",
+                modal_feed_ph: "Нежареные семечки, просо...",
+                modal_report_title: "Сообщить о проблеме 🛠️",
+                modal_report_label: "Что случилось со станцией?",
+                modal_report_ph: "Сломано крепление, упала крыша...",
+                modal_name_label: "Ваше имя",
+                modal_name_ph: "Например, Алихан",
+                modal_photo_label: "Прикрепить фото (для модерации)",
+                modal_submit_btn: "Отправить отчёт волонтёрам",
+                toast_copy_success: "Номер +7 (705) 980-33-63 скопирован в буфер! Спасибо 💚",
+                toast_copy_fallback: "Скопируйте номер вручную: +7 705 980-33-63",
+                toast_submit_success: "Отчёт успешно добавлен в журнал! Спасибо за заботу о птицах 🌿",
+                status_feed_done: "Пополнено (На проверке)",
+                status_report_done: "Заявка на ремонт принята",
+                time_just_now: "Только что",
+                time_today: "Сегодня",
+                time_yesterday: "Вчера",
+                note_feed: "Фото проверено волонтёром",
+                note_clean: "Плановый обход AITU",
+                note_report: "Передано волонтёрам",
+                note_user_sent: "Отправлено на модерацию AITU",
+                allowed_items: [
+                    { icon: "🌻", title: "Семечки подсолнечника", desc: "строго нежареные и несолёные!" },
+                    { icon: "🌾", title: "Просо, овёс, пшеница", desc: "любимая еда воробьёв и щеглов" },
+                    { icon: "🎃", title: "Сырые семечки тыквы и арбуза", desc: "богаты натуральными маслами" },
+                    { icon: "🍎", title: "Сушёные ягоды и яблоки", desc: "рябина, боярышник для снегирей и свиристелей" },
+                    { icon: "🥓", title: "Несолёное сало", desc: "даёт ценную энергию синицам в мороз" }
+                ],
+                forbidden_items: [
+                    { icon: "🍞", title: "Свежий и чёрный хлеб", desc: "вызывает брожение в зобе и гибель птицы" },
+                    { icon: "🧂", title: "Любое солёное, жареное, острое", desc: "соль — смертельный яд для почек птиц" },
+                    { icon: "🥨", title: "Чипсы, сухарики, печенье", desc: "содержат опасные трансжиры и химикаты" },
+                    { icon: "🍚", title: "Шлифованный белый рис и пшено", desc: "быстро окисляется на открытом воздухе" },
+                    { icon: "🦠", title: "Заплесневелые или испорченные крупы", desc: "токсичны для мелких пернатых" }
+                ],
+                birds_data: [
+                    {
+                        name: "Большая синица",
+                        latin: "Parus major",
+                        type: "Оседлая",
+                        desc: "Жёлтая грудка с чёрным «галстуком». Главный санитар парков и частый гость кормушек.",
+                        foodIcon: "🌻",
+                        food: "Нежареные семечки, сало",
+                        img: "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1b/Great_tit_%28Parus_major%29%2C_Parc_du_Rouge-Cloitre%2C_For%C3%AAt_de_Soignes%2C_Brussels_%2826194636951%29.jpg/500px-Great_tit_%28Parus_major%29%2C_Parc_du_Rouge-Cloitre%2C_For%C3%AAt_de_Soignes%2C_Brussels_%2826194636951%29.jpg",
+                        localImg: "images/parus_major.jpg"
+                    },
+                    {
+                        name: "Полевой воробей",
+                        latin: "Passer montanus",
+                        type: "Оседлая",
+                        desc: "Коричневая шапочка и пятнышки на щеках. Держится дружными стайками в скверах столицы.",
+                        foodIcon: "🌾",
+                        food: "Просо, овёс, пшеница",
+                        img: "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/98/Tree_Sparrow_August_2007_Osaka_Japan.jpg/500px-Tree_Sparrow_August_2007_Osaka_Japan.jpg",
+                        localImg: "images/passer_montanus.jpg"
+                    },
+                    {
+                        name: "Обыкновенный снегирь",
+                        latin: "Pyrrhula pyrrhula",
+                        type: "Кочующая",
+                        desc: "Ярко-алая грудка у самцов. Прилетает в Астану с морозами, питается почками и семенами.",
+                        foodIcon: "🍒",
+                        food: "Ягоды рябины, семена ясеня",
+                        img: "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/de/Bullfinch_male.jpg/500px-Bullfinch_male.jpg",
+                        localImg: "images/pyrrhula_pyrrhula.jpg"
+                    },
+                    {
+                        name: "Свиристель",
+                        latin: "Bombycilla garrulus",
+                        type: "Кочующая",
+                        desc: "Шелковистое оперение с выразительным хохолком. Обожает лакомиться ягодами на деревьях.",
+                        foodIcon: "🍎",
+                        food: "Сушёные ягоды, яблоки",
+                        img: "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/16/Bombycilla_garrulus%2C_Novosibirsk_1.jpg/500px-Bombycilla_garrulus%2C_Novosibirsk_1.jpg",
+                        localImg: "images/bombycilla_garrulus.jpg"
+                    }
+                ]
+            },
+            kz: {
+                site_title: "Құстарды құтқар!",
+                site_sub: "Астана • AITU EcoProject",
+                nav_station: "Станция (QR)",
+                nav_map: "Карта",
+                nav_rules: "Қоректендіру",
+                nav_birds: "Астана құстары",
+                nav_donate: "Қолдау",
+                pills_label: "Жүйе станциялары:",
+                qr_scanned_badge: "Жемсауыттың QR-коды белсенді",
+                feed_status_label: "Жем қорының күйі:",
+                last_check_label: "Соңғы тексеру:",
+                btn_feed: "Мен жем салдым!",
+                btn_report: "Ақау туралы хабарлау",
+                log_title: "Станцияға күтім журналы",
+                log_verified: "AITU модерациясы",
+                log_empty: "Бұл станция бойынша жазба әзірге жоқ. Алғашқысы болыңыз!",
+                map_title: "Астана жемсауыттарының картасы",
+                map_sub: "Жемсауыттың карточкасын ашу үшін картадағы белгіні басыңыз",
+                legend_full: "Толы",
+                legend_low: "Жем аз",
+                legend_repair: "Жөндеу қажет",
+                open_card_btn: "Карточканы ашу",
+                check_prefix: "Тексеру: ",
+                rules_title: "Қауіпсіз қоректендіру ережелері",
+                rules_sub: "Астанада қыста аяз -35°C-қа дейін жетіп, қатты боран соғады. Дұрыс емес жем құсты өлтіріп алуы мүмкін!",
+                rules_allowed_title: "НЕ БЕРУГЕ БОЛАДЫ:",
+                rules_forbidden_title: "ҚАТАҢ ТЫЙЫМ САЛЫНАДЫ:",
+                birds_title: "Жемсауыттан кімдерді көруге болады?",
+                birds_sub: "Қатал аязды өткеруге көмектесетін Астананың қыстайтын құстары",
+                birds_badge: "4 негізгі түрі",
+                donate_badge: "Жобаны қолдау",
+                donate_title: "Дән-дақылдар мен жаңа жемсауыттарға 🌻",
+                donate_desc: "Жиналған барлық қаражат қысқы қауіпсіз дәнді азық сатып алуға және Астана студенттері мен еріктілерінің жаңа эко-жемсауыттарын жасауына жұмсалады.",
+                donate_collected: "Қысқы жем қорына жиналды: 18 500 ₸",
+                donate_goal: "Мақсат: 50 000 ₸",
+                kaspi_title: "Жылдам аударым",
+                kaspi_sub: "Жоба еріктісіне аудару (Бақдәулет Ә.)",
+                btn_copy: "Нөмірді көшіру",
+                footer_title: "«Құстарды құтқар! Астана» жобасы",
+                footer_desc: "QR-кодтары бар қауіпсіз қысқы жемсауыттар желісі мен күтімді үйлестіру веб-сервисінің концепциясы.",
+                footer_uni: "Оқу орны: Astana IT University (AITU)",
+                footer_authors: "Жоба авторлары:",
+                modal_feed_title: "Жем салынғанын белгілеу 🌻",
+                modal_feed_label: "Қандай жем салдыңыз?",
+                modal_feed_ph: "Қуырылмаған күнбағыс дәні, тары...",
+                modal_report_title: "Ақау туралы хабарлау 🛠️",
+                modal_report_label: "Станцияда не болды?",
+                modal_report_ph: "Бекіткіші сынған, шатыры түскен...",
+                modal_name_label: "Атыңыз",
+                modal_name_ph: "Мысалы, Әлихан",
+                modal_photo_label: "Фото қосу (тексеру үшін)",
+                modal_submit_btn: "Еріктілерге есеп жіберу",
+                toast_copy_success: "+7 (705) 980-33-63 нөмірі көшірілді! Рақмет 💚",
+                toast_copy_fallback: "Нөмірді қолмен көшіріңіз: +7 705 980-33-63",
+                toast_submit_success: "Есеп журналға сәтті қосылды! Құстарға қамқорлығыңызға рақмет 🌿",
+                status_feed_done: "Жем салынды (Тексерілуде)",
+                status_report_done: "Жөндеу өтінімі қабылданды",
+                time_just_now: "Жаңа ғана",
+                time_today: "Бүгін",
+                time_yesterday: "Кеше",
+                note_feed: "Фото еріктімен тексерілді",
+                note_clean: "AITU жоспарлы тексеруі",
+                note_report: "Еріктілерге жіберілді",
+                note_user_sent: "AITU модерациясына жіберілді",
+                allowed_items: [
+                    { icon: "🌻", title: "Күнбағыс дәндері", desc: "міндетті түрде қуырылмаған және тұзсыз!" },
+                    { icon: "🌾", title: "Тары, сұлы, бидай", desc: "торғайлар мен сарышымшықтардың сүйікті асы" },
+                    { icon: "🎃", title: "Шикі асқабақ пен қарбыз дәндері", desc: "табиғи пайдалы майларға бай" },
+                    { icon: "🍎", title: "Кептірілген жидектер мен алма", desc: "суықторғайлар мен самырсындарға арналған" },
+                    { icon: "🥓", title: "Тұздалмаған май (сало)", desc: "шындығында аязда шымшықтарға мол қуат береді" }
+                ],
+                forbidden_items: [
+                    { icon: "🍞", title: "Жаңа піскен және қара нан", desc: "асқазанда ашу процесін туғызып, өлімге әкеледі" },
+                    { icon: "🧂", title: "Кез келген тұзды, қуырылған, ащы", desc: "тұз — құстың бүйрегі үшін өлім қаупі" },
+                    { icon: "🥨", title: "Чипстер, кептірілген нан, печенье", desc: "зиянды транс-майлар мен қоспалары бар" },
+                    { icon: "🍚", title: "Ақ күріш және сөк", desc: "ашық ауада өте жылдам тотығады" },
+                    { icon: "🦠", title: "Көгерген немесе бұзылған жармалар", desc: "құстар үшін қауіпті улы заттарға толы" }
+                ],
+                birds_data: [
+                    {
+                        name: "Үлкен шымшық",
+                        latin: "Parus major",
+                        type: "Отырықшы",
+                        desc: "Сары кеудесі мен қара «галстугымен» танымал. Саябақтардың санитары және жемсауыттардың белсенді қонағы.",
+                        foodIcon: "🌻",
+                        food: "Қуырылмаған күнбағыс дәні, май",
+                        img: "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1b/Great_tit_%28Parus_major%29%2C_Parc_du_Rouge-Cloitre%2C_For%C3%AAt_de_Soignes%2C_Brussels_%2826194636951%29.jpg/500px-Great_tit_%28Parus_major%29%2C_Parc_du_Rouge-Cloitre%2C_For%C3%AAt_de_Soignes%2C_Brussels_%2826194636951%29.jpg",
+                        localImg: "images/parus_major.jpg"
+                    },
+                    {
+                        name: "Дала торғайы",
+                        latin: "Passer montanus",
+                        type: "Отырықшы",
+                        desc: "Қоңыр бөрікшесі мен бетіндегі қара дақтары бар. Елорда саябақтарында топтасып ұшады.",
+                        foodIcon: "🌾",
+                        food: "Тары, сұлы, бидай",
+                        img: "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/98/Tree_Sparrow_August_2007_Osaka_Japan.jpg/500px-Tree_Sparrow_August_2007_Osaka_Japan.jpg",
+                        localImg: "images/passer_montanus.jpg"
+                    },
+                    {
+                        name: "Кәдімгі суықторғай",
+                        latin: "Pyrrhula pyrrhula",
+                        type: "Көшпелі",
+                        desc: "Аталықтарының кеудесі ашық қызыл түсті. Астанаға қысқы суықпен бірге келіп, жидектермен қоректенеді.",
+                        foodIcon: "🍒",
+                        food: "Шетен жидектері, шаған тұқымы",
+                        img: "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/de/Bullfinch_male.jpg/500px-Bullfinch_male.jpg",
+                        localImg: "images/pyrrhula_pyrrhula.jpg"
+                    },
+                    {
+                        name: "Самырсынқұс (Свиристель)",
+                        latin: "Bombycilla garrulus",
+                        type: "Көшпелі",
+                        desc: "Басында сәнді айдары бар жібектей қауырсынды құс. Ағашта қалған шетен мен алмаларды жақсы көреді.",
+                        foodIcon: "🍎",
+                        food: "Кептірілген жидектер, алма",
+                        img: "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/16/Bombycilla_garrulus%2C_Novosibirsk_1.jpg/500px-Bombycilla_garrulus%2C_Novosibirsk_1.jpg",
+                        localImg: "images/bombycilla_garrulus.jpg"
+                    }
+                ]
+            }
+        };
+
+        // Локализованные данные станций
+        const stationsLocalization = {
+            1: {
+                ru: { name: "Станция #01: Кампус AITU (Главный вход)", shortName: "#01 AITU", desc: "Экспо-территория, возле главного входа Astana IT University. Главная станция студенческого эко-патруля." },
+                kz: { name: "№01 станция: AITU кампусы (Бас кіреберіс)", shortName: "#01 AITU", desc: "ЭКСПО аумағы, Astana IT University бас кіреберісінің маңы. Студенттік эко-патрульдің басты станциясы." }
+            },
+            2: {
+                ru: { name: "Станция #02: Ботанический сад (Северная аллея)", shortName: "#02 Ботсад", desc: "Северная аллея Ботанического сада, рядом с оранжереей. Тихое место среди хвойных деревьев." },
+                kz: { name: "№02 станция: Ботаникалық бақ (Солтүстік аллея)", shortName: "#02 Ботбақ", desc: "Ботаникалық бақтың солтүстік аллеясы, оранжерея маңы. Қылқанжапырақты ағаштар арасындағы тыныш мекен." }
+            },
+            3: {
+                ru: { name: "Станция #03: Линейный парк (Abu Dhabi Plaza)", shortName: "#03 Линейный", desc: "Линейный парк со стороны Abu Dhabi Plaza. Высокая проходимость, здесь часто собираются синицы и воробьи." },
+                kz: { name: "№03 станция: Желілік саябақ (Abu Dhabi Plaza)", shortName: "#03 Желілік", desc: "Abu Dhabi Plaza жағындағы Желілік саябақ. Адамдар көп жүретін орын, шымшықтар мен торғайлар жиі жиналады." }
+            },
+            4: {
+                ru: { name: "Станция #04: Сквер возле EXPO", shortName: "#04 EXPO Сквер", desc: "Зелёный сквер возле павильона Nur Alem (EXPO). Открытое ветреное пространство, требуется частый контроль корма." },
+                kz: { name: "№04 станция: EXPO маңындағы саябақ", shortName: "#04 EXPO Саябақ", desc: "«Нұр Әлем» павильоны (EXPO) маңындағы жасыл саябақ. Ашық желді аймақ, жемнің тұрақты бақылауын қажет етеді." }
+            }
+        };
+
+        const initialStations = [
+            { id: 1, coords: [51.0908, 71.4183], statusKey: 'low', color: "#f59e0b", timeRu: "Вчера, 16:40", timeKz: "Кеше, 16:40" },
+            { id: 2, coords: [51.1035, 71.4160], statusKey: 'full', color: "#10b981", timeRu: "Сегодня, 10:15", timeKz: "Бүгін, 10:15" },
+            { id: 3, coords: [51.1180, 71.4280], statusKey: 'full', color: "#10b981", timeRu: "Сегодня, 11:30", timeKz: "Бүгін, 11:30" },
+            { id: 4, coords: [51.0885, 71.4120], statusKey: 'repair', color: "#f43f5e", timeRu: "3 дня назад", timeKz: "3 күн бұрын" }
+        ];
+
+        const defaultLogs = {
+            1: [
+                { name: "Балауса Қ.", actionRu: "пополнила корм (Семечки)", actionKz: "жем салды (Күнбағыс дәндері)", timeRu: "Вчера в 16:40", timeKz: "Кеше, 16:40", noteRu: "Фото проверено волонтёром", noteKz: "Фото еріктімен тексерілді", type: "feed" },
+                { name: "Бақдәулет Ә.", actionRu: "провёл санитарную очистку", actionKz: "санитарлық тазалау жүргізді", timeRu: "3 дня назад", timeKz: "3 күн бұрын", noteRu: "Плановый обход AITU", noteKz: "AITU жоспарлы тексеруі", type: "clean" }
+            ],
+            2: [
+                { name: "Әлихан М.", actionRu: "насыпал просо и овёс", actionKz: "тары мен сұлы салды", timeRu: "Сегодня в 10:15", timeKz: "Бүгін, 10:15", noteRu: "Кормушка полная", noteKz: "Жемсауыт толы", type: "feed" },
+                { name: "Эко-патруль AITU", actionRu: "проверил крепления кормушки", actionKz: "жемсауыт бекіткішін тексерді", timeRu: "2 дня назад", timeKz: "2 күн бұрын", noteRu: "Всё надежно", noteKz: "Бәрі сенімді", type: "clean" }
+            ],
+            3: [
+                { name: "Динара С.", actionRu: "пополнила сырые семечки", actionKz: "шикі күнбағыс дәнін салды", timeRu: "Сегодня в 11:30", timeKz: "Бүгін, 11:30", noteRu: "Стайка птиц уже кормится", noteKz: "Құстар тобы қоректеніп жатыр", type: "feed" }
+            ],
+            4: [
+                { name: "Арман Т.", actionRu: "сообщил о поломке крепления", actionKz: "бекіткіштің сынғанын хабарлады", timeRu: "3 дня назад", timeKz: "3 күн бұрын", noteRu: "Передано волонтёрам", noteKz: "Еріктілерге берілді", type: "report" }
+            ]
+        };
+
+        // Загрузка состояния из LocalStorage
+        function loadStoredStations() {
+            try {
+                const stored = localStorage.getItem('savebirds_stations');
+                if (stored) {
+                    const parsed = JSON.parse(stored);
+                    return initialStations.map(st => {
+                        const saved = parsed.find(p => p.id === st.id);
+                        return saved ? { ...st, ...saved } : st;
+                    });
+                }
+            } catch (e) {
+                console.warn("LocalStorage stations load error", e);
+            }
+            return initialStations;
+        }
+
+        function loadStoredLogs() {
+            try {
+                const stored = localStorage.getItem('savebirds_logs');
+                if (stored) {
+                    return JSON.parse(stored);
+                }
+            } catch (e) {
+                console.warn("LocalStorage logs load error", e);
+            }
+            return defaultLogs;
+        }
+
+        // Язык интерфейса
+        let currentLang = localStorage.getItem('savebirds_lang') || 'ru';
+        const urlParams = new URLSearchParams(window.location.search);
+        const langParam = urlParams.get('lang');
+        if (langParam === 'kz' || langParam === 'ru') {
+            currentLang = langParam;
+        }
+
+        const stations = loadStoredStations();
+        const logs = loadStoredLogs();
+        let currentStationId = 1;
+        let markers = {};
+
+        // Инициализация карты
+        const map = L.map('map').setView([51.092, 71.418], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Функция перевода статуса
+        function getStatusText(st) {
+            const t = i18n[currentLang];
+            if (st.statusCustom) {
+                return currentLang === 'kz' ? (st.statusCustomKz || st.statusCustom) : st.statusCustom;
+            }
+            if (st.statusKey === 'full') return t.legend_full;
+            if (st.statusKey === 'repair') return t.legend_repair;
+            return t.legend_low;
+        }
+
+        function getTimeText(st) {
+            return currentLang === 'kz' ? (st.timeKz || st.timeRu) : (st.timeRu || st.timeKz);
+        }
+
+        // Отрисовка маркеров на карте
+        function renderMarkers() {
+            const t = i18n[currentLang];
+            stations.forEach(st => {
+                const loc = stationsLocalization[st.id][currentLang];
+                const statusText = getStatusText(st);
+                const timeText = getTimeText(st);
+
+                const markerHtml = `<div style="background-color:${st.color}; width:22px; height:22px; border-radius:50%; border:3px solid white; box-shadow:0 3px 8px rgba(0,0,0,0.35); transition:transform 0.2s;" class="hover:scale-125"></div>`;
+                const icon = L.divIcon({ html: markerHtml, className: '' });
+                
+                if (markers[st.id]) {
+                    map.removeLayer(markers[st.id]);
+                }
+
+                const marker = L.marker(st.coords, { icon }).addTo(map);
+                marker.bindPopup(`
+                    <div style="font-family:'Nunito',sans-serif; min-width:190px; padding:2px;">
+                        <div style="font-weight:800; font-size:13px; color:#0f172a; margin-bottom:4px;">${loc.name}</div>
+                        <div style="color:${st.color}; font-weight:700; font-size:12px; display:flex; align-items:center; gap:4px; margin-bottom:2px;">
+                            <span>●</span> ${statusText}
+                        </div>
+                        <div style="color:#64748b; font-size:11px; margin-bottom:8px;">${t.check_prefix}${timeText}</div>
+                        <button onclick="selectStation(${st.id}, true)" style="background:#059669; color:white; border:none; padding:6px 12px; border-radius:8px; cursor:pointer; font-size:11px; font-weight:700; width:100%; transition:background 0.2s;">
+                            ${t.open_card_btn}
+                        </button>
+                    </div>
+                `, { className: 'custom-popup' });
+
+                markers[st.id] = marker;
+            });
+        }
+
+        // Рендер кнопок быстрого выбора кормушки
+        function renderStationPills() {
+            const container = document.getElementById('station-pills');
+            container.innerHTML = stations.map(st => {
+                const loc = stationsLocalization[st.id][currentLang];
+                return `
+                    <button onclick="selectStation(${st.id}, true)" id="pill-${st.id}" 
+                        class="px-2.5 py-1 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${st.id === currentStationId ? 'bg-white text-emerald-950 shadow-sm border border-emerald-200' : 'bg-white/80 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 border border-slate-200'}">
+                        <span class="w-2 h-2 rounded-full" style="background-color:${st.color};"></span>
+                        ${loc.shortName}
+                    </button>
+                `;
+            }).join('');
+        }
+
+        // Рендер правил подкормки
+        function renderRules() {
+            const t = i18n[currentLang];
+            const allowedContainer = document.getElementById('rules-allowed-list');
+            const forbiddenContainer = document.getElementById('rules-forbidden-list');
+
+            allowedContainer.innerHTML = t.allowed_items.map(item => `
+                <li class="flex items-center gap-2.5">
+                    <span class="text-lg">${item.icon}</span>
+                    <span><b>${item.title}</b> (${item.desc})</span>
+                </li>
+            `).join('');
+
+            forbiddenContainer.innerHTML = t.forbidden_items.map(item => `
+                <li class="flex items-center gap-2.5">
+                    <span class="text-lg">${item.icon}</span>
+                    <span><b>${item.title}</b> (${item.desc})</span>
+                </li>
+            `).join('');
+        }
+
+        // Рендер карточек птиц
+        function renderBirds() {
+            const t = i18n[currentLang];
+            const container = document.getElementById('birds-grid');
+            container.innerHTML = t.birds_data.map(bird => `
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden group hover:shadow-md transition">
+                    <div class="relative h-44 overflow-hidden bg-slate-100">
+                        <img src="${bird.localImg}" 
+                             onerror="if(this.src!=='${bird.img}'){this.src='${bird.img}';}"
+                             alt="${bird.name}" 
+                             loading="lazy"
+                             class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+                        <span class="absolute top-2 left-2 bg-slate-900/75 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-0.5 rounded-md">${bird.type}</span>
+                    </div>
+                    <div class="p-4">
+                        <h3 class="font-extrabold text-slate-900 text-base leading-tight">${bird.name}</h3>
+                        <div class="text-[11px] text-slate-400 italic mb-2">${bird.latin}</div>
+                        <p class="text-xs text-slate-600 mb-3 leading-relaxed">${bird.desc}</p>
+                        <div class="text-[11px] bg-amber-50 text-amber-800 font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+                            <span>${bird.foodIcon}</span> ${bird.food}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Выбор активной станции (по клику, по QR или параметру ?station=ID)
+        function selectStation(id, scrollToStation = false, updateHistory = true) {
+            const st = stations.find(s => s.id === id);
+            if (!st) return;
+
+            currentStationId = id;
+            const loc = stationsLocalization[st.id][currentLang];
+            const statusText = getStatusText(st);
+            const timeText = getTimeText(st);
+
+            // Обновляем шапку станции
+            document.getElementById('station-title').innerText = loc.name;
+            document.getElementById('station-desc').innerText = loc.desc;
+            
+            // Статус и время
+            const statusEl = document.getElementById('station-status');
+            const iconName = st.statusKey === 'full' ? 'check-circle' : (st.statusKey === 'repair' ? 'alert-triangle' : 'alert-circle');
+            const colorClass = st.statusKey === 'full' ? 'text-emerald-300' : (st.statusKey === 'repair' ? 'text-rose-300' : 'text-amber-300');
+            
+            statusEl.innerHTML = `<i data-lucide="${iconName}" class="w-4 h-4 ${colorClass}"></i> <span class="${colorClass}">${statusText}</span>`;
+            document.getElementById('station-time').innerText = timeText;
+
+            // Рендер журнала активности для этой станции
+            renderActivityLog(id);
+
+            // Обновляем подсветку кнопок выбора
+            renderStationPills();
+
+            // Перемещаем карту на выбранную кормушку
+            map.flyTo(st.coords, 14, { duration: 0.8 });
+            if (markers[id]) {
+                markers[id].openPopup();
+            }
+
+            // Обновляем адресную строку браузера (?station=ID&lang=LANG) без перезагрузки
+            if (updateHistory) {
+                const newUrl = new URL(window.location);
+                newUrl.searchParams.set('station', id);
+                newUrl.searchParams.set('lang', currentLang);
+                window.history.replaceState({ station: id, lang: currentLang }, '', newUrl);
+            }
+
+            if (scrollToStation) {
+                const section = document.getElementById('station');
+                section.scrollIntoView({ behavior: 'smooth' });
+            }
+
+            lucide.createIcons();
+        }
+
+        // Рендер журнала ухода за выбранной станцией
+        function renderActivityLog(stationId) {
+            const t = i18n[currentLang];
+            const container = document.getElementById('activity-log');
+            const stationLogs = logs[stationId] || [];
+
+            if (stationLogs.length === 0) {
+                container.innerHTML = `
+                    <div class="p-4 text-center text-slate-400 bg-slate-50 rounded-xl">
+                        ${t.log_empty}
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = stationLogs.map(item => {
+                let icon = 'check-circle-2';
+                let iconBg = 'bg-emerald-100 text-emerald-700';
+                if (item.type === 'clean') {
+                    icon = 'sparkles';
+                    iconBg = 'bg-blue-100 text-blue-700';
+                } else if (item.type === 'report') {
+                    icon = 'alert-triangle';
+                    iconBg = 'bg-rose-100 text-rose-700';
+                }
+
+                const action = currentLang === 'kz' ? (item.actionKz || item.actionRu) : (item.actionRu || item.actionKz);
+                const time = currentLang === 'kz' ? (item.timeKz || item.timeRu) : (item.timeRu || item.timeKz);
+                const note = currentLang === 'kz' ? (item.noteKz || item.noteRu) : (item.noteRu || item.noteKz);
+
+                return `
+                    <div class="flex items-start gap-3 p-2.5 rounded-xl bg-slate-50 border border-slate-100 transition hover:bg-slate-100/70">
+                        <div class="${iconBg} p-2 rounded-lg flex-shrink-0">
+                            <i data-lucide="${icon}" class="w-4 h-4"></i>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <div class="font-bold text-slate-800 truncate">${item.name} ${action}</div>
+                            <div class="text-[11px] text-slate-400">${time} • ${note}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            lucide.createIcons();
+        }
+
+        // Установка языка (KZ / RU)
+        function setLanguage(lang) {
+            currentLang = lang;
+            localStorage.setItem('savebirds_lang', lang);
+
+            // Кнопки языка
+            const btnKz = document.getElementById('lang-btn-kz');
+            const btnRu = document.getElementById('lang-btn-ru');
+            if (lang === 'kz') {
+                btnKz.className = "px-2.5 py-1 rounded-lg transition duration-200 bg-emerald-600 text-white shadow-sm font-extrabold";
+                btnRu.className = "px-2.5 py-1 rounded-lg transition duration-200 text-slate-600 hover:text-emerald-700 font-extrabold";
+                document.documentElement.lang = "kk";
+            } else {
+                btnRu.className = "px-2.5 py-1 rounded-lg transition duration-200 bg-emerald-600 text-white shadow-sm font-extrabold";
+                btnKz.className = "px-2.5 py-1 rounded-lg transition duration-200 text-slate-600 hover:text-emerald-700 font-extrabold";
+                document.documentElement.lang = "ru";
+            }
+
+            // Статичные переводы
+            const t = i18n[lang];
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (t[key]) el.innerText = t[key];
+            });
+
+            document.querySelectorAll('[data-i18n-ph]').forEach(el => {
+                const key = el.getAttribute('data-i18n-ph');
+                if (t[key]) el.placeholder = t[key];
+            });
+
+            // Рендер динамических компонентов
+            renderRules();
+            renderBirds();
+            renderMarkers();
+            selectStation(currentStationId, false, true);
+            lucide.createIcons();
+        }
+
+        // Логика модального окна
+        let currentAction = 'feed';
+        function openModal(type) {
+            currentAction = type;
+            const t = i18n[currentLang];
+            const modal = document.getElementById('modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            if (type === 'feed') {
+                document.getElementById('modal-title').innerText = t.modal_feed_title;
+                document.getElementById('modal-desc-label').innerText = t.modal_feed_label;
+                document.getElementById('user-desc').placeholder = t.modal_feed_ph;
+            } else {
+                document.getElementById('modal-title').innerText = t.modal_report_title;
+                document.getElementById('modal-desc-label').innerText = t.modal_report_label;
+                document.getElementById('user-desc').placeholder = t.modal_report_ph;
+            }
+            lucide.createIcons();
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        // Отправка формы отчёта
+        function submitForm(e) {
+            e.preventDefault();
+            const t = i18n[currentLang];
+            const name = document.getElementById('user-name').value.trim();
+            const desc = document.getElementById('user-desc').value.trim();
+            if (!name || !desc) return;
+
+            const st = stations.find(s => s.id === currentStationId);
+            const timeRu = "Сегодня, " + new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+            const timeKz = "Бүгін, " + new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+
+            // Новая запись в журнал
+            const newLog = {
+                name: name,
+                actionRu: currentAction === 'feed' ? `насыпал(а) корм (${desc})` : `сообщил(а): ${desc}`,
+                actionKz: currentAction === 'feed' ? `жем салды (${desc})` : `хабарлады: ${desc}`,
+                timeRu: "Только что",
+                timeKz: "Жаңа ғана",
+                noteRu: "Отправлено на модерацию AITU",
+                noteKz: "AITU модерациясына жіберілді",
+                type: currentAction
+            };
+
+            if (!logs[currentStationId]) logs[currentStationId] = [];
+            logs[currentStationId].unshift(newLog);
+
+            // Обновляем статус станции
+            if (currentAction === 'feed') {
+                st.statusKey = "full";
+                st.statusCustom = "Пополнено (На проверке)";
+                st.statusCustomKz = "Жем салынды (Тексерілуде)";
+                st.color = "#10b981";
+                st.timeRu = timeRu;
+                st.timeKz = timeKz;
+            } else {
+                st.statusKey = "repair";
+                st.statusCustom = "Заявка на ремонт принята";
+                st.statusCustomKz = "Жөндеу өтінімі қабылданды";
+                st.color = "#f43f5e";
+                st.timeRu = timeRu;
+                st.timeKz = timeKz;
+            }
+
+            // Сохраняем в LocalStorage для сохранности при перезагрузке
+            try {
+                localStorage.setItem('savebirds_logs', JSON.stringify(logs));
+                localStorage.setItem('savebirds_stations', JSON.stringify(stations.map(s => ({
+                    id: s.id, 
+                    statusKey: s.statusKey, 
+                    statusCustom: s.statusCustom, 
+                    statusCustomKz: s.statusCustomKz, 
+                    color: s.color, 
+                    timeRu: s.timeRu,
+                    timeKz: s.timeKz
+                }))));
+            } catch (err) {
+                console.warn("LocalStorage save error", err);
+            }
+
+            // Перерисовываем маркеры и интерфейс
+            renderMarkers();
+            selectStation(currentStationId, false, false);
+            closeModal();
+            e.target.reset();
+
+            // Показываем Toast
+            showToast(t.toast_submit_success, "success");
+        }
+
+        // Всплывающие уведомления (Toast)
+        let toastTimeout;
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const msgEl = document.getElementById('toast-message');
+            const iconEl = document.getElementById('toast-icon');
+
+            msgEl.innerText = message;
+
+            if (type === 'success') {
+                iconEl.className = "p-2 bg-emerald-500 rounded-xl text-white flex-shrink-0";
+                iconEl.innerHTML = `<i data-lucide="check" class="w-4 h-4"></i>`;
+            } else {
+                iconEl.className = "p-2 bg-amber-500 rounded-xl text-white flex-shrink-0";
+                iconEl.innerHTML = `<i data-lucide="info" class="w-4 h-4"></i>`;
+            }
+
+            toast.classList.remove('translate-y-24', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+            lucide.createIcons();
+
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-24', 'opacity-0');
+            }, 3500);
+        }
+
+        // Копирование номера Kaspi с fallback
+        function copyKaspiNumber() {
+            const t = i18n[currentLang];
+            const phone = "+77059803363";
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(phone).then(() => {
+                    showToast(t.toast_copy_success, "success");
+                }).catch(() => {
+                    fallbackCopy(phone);
+                });
+            } else {
+                fallbackCopy(phone);
+            }
+        }
+
+        function fallbackCopy(text) {
+            const t = i18n[currentLang];
+            const ta = document.createElement("textarea");
+            ta.value = text;
+            ta.style.position = "fixed";
+            ta.style.opacity = "0";
+            document.body.appendChild(ta);
+            ta.focus();
+            ta.select();
+            try {
+                document.execCommand('copy');
+                showToast(t.toast_copy_success, "success");
+            } catch (e) {
+                showToast(t.toast_copy_fallback, "info");
+            }
+            document.body.removeChild(ta);
+        }
+
+        // Автоопределение станции из URL (?station=ID)
+        function initStationFromURL() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const stationParam = parseInt(urlParams.get('station'), 10);
+            if (stationParam && stations.some(s => s.id === stationParam)) {
+                return stationParam;
+            }
+            return 1;
+        }
+
+        // Запуск при загрузке страницы
+        window.addEventListener('DOMContentLoaded', () => {
+            setLanguage(currentLang);
+            const initialId = initStationFromURL();
+            selectStation(initialId, false, false);
+            lucide.createIcons();
+        });
+    </script>
+</body>
+</html>
